@@ -13,7 +13,7 @@ import java.util.Set;
 
 public class P10P2 {
   public static void main(String[] args) throws Exception {
-    List<String> lines = Files.readAllLines(Paths.get("./data/10-test3.txt"));
+    List<String> lines = Files.readAllLines(Paths.get("./data/10.txt"));
 
     char[][] maze = new char[lines.size()][];
     boolean[][] visited = new boolean[lines.size()][];
@@ -33,114 +33,93 @@ public class P10P2 {
 
     List<Point> path = getTraversalPath(maze, start, visited);
 
-    boolean[][] partOfPath = new boolean[maze.length][];
-    // null = untriaged, true = yes, false = no
-    Boolean[][] insidePath = new Boolean[maze.length][];
-    for (int r = 0; r < maze.length; r++) {
-      partOfPath[r] = new boolean[maze[0].length];
-      insidePath[r] = new Boolean[maze[0].length];
+    // Rebuild maze in 2x.
+    char[][] doubleMaze = new char[maze.length * 2][];
+    SpotLabel[][] labels = new SpotLabel[maze.length * 2][];
+    for (int r = 0; r < doubleMaze.length; r++) {
+      doubleMaze[r] = new char[maze[0].length * 2];
+      labels[r] = new SpotLabel[maze[0].length * 2];
+      for (int c = 0; c < doubleMaze[0].length; c++) {
+        doubleMaze[r][c] = ' ';
+      }
     }
 
-    for (Point p : path) {
-      partOfPath[p.r][p.c] = true;
-    }
-
-    // Traverse entire maze from the outside edge.
-    // FIXME
-
-    int inner = 0;
+    // Copy dots only once.
     for (int r = 0; r < maze.length; r++) {
       for (int c = 0; c < maze[0].length; c++) {
-        // sorry.
-        if (insidePath[r][c] != null && insidePath[r][c] != false) {
-          inner++;
+        doubleMaze[r * 2][c * 2] = '.';
+      }
+    }
+
+    // Put the original path in, at 2x.
+    for (Point p : path) {
+      doubleMaze[p.r * 2][p.c * 2] = maze[p.r][p.c];
+      labels[p.r * 2][p.c * 2] = SpotLabel.PATH;
+    }
+    // Fill the gaps.
+    for (int i = 0; i < path.size() - 1; i++) {
+      Point p1 = path.get(i);
+      Point p2 = path.get(i + 1);
+      fillGap(p1, p2, doubleMaze, labels);
+    }
+    // Fill the start to the first point.
+    // The start is the last point.
+    fillGap(path.get(0), path.get(path.size() - 1), doubleMaze, labels);
+
+    // Traverse entire maze from the outside edge.
+    for (int c = 0; c < doubleMaze[0].length; c++) {
+      markOuter(new Point(0, c), doubleMaze, labels);
+      markOuter(new Point(doubleMaze.length - 1, c), doubleMaze, labels);
+    }
+    for (int r = 0; r < doubleMaze.length; r++) {
+      markOuter(new Point(r, 0), doubleMaze, labels);
+      markOuter(new Point(r, doubleMaze[0].length - 1), doubleMaze, labels);
+    }
+
+    // Count unlabeled periods.
+    int area = 0;
+    for (int r = 0; r < doubleMaze.length; r++) {
+      for (int c = 0; c < doubleMaze[0].length; c++) {
+        // Inner isn't really labeled.
+        if (doubleMaze[r][c] != ' ' && labels[r][c] == null) {
+          area++;
         }
       }
     }
-
-    System.out.println("All done: " + inner);
-  }
-
-  private static void markOuter(Point point, Direction cameFrom, char[][] maze, boolean[][] partOfPath,
-      Boolean[][] insidePath) {
-    if (!point.isValid(maze)) {
-      return;
-    }
-    // TODO: Does this need three states?
-    if (insidePath[point.r][point.c] != null) {
-      return;
-    }
-    // If this traversal can reach it, it should always be false?
-    insidePath[point.r][point.c] = false;
-
-    // Compare pairs to see if it's permeable.
-    if (partOfPath[point.r][point.c]) {
-      Point p1 = point;
-      // Find the pairs to investigate.
-      Point p2, p3;
-      if (cameFrom.isVertical()) {
-        p2 = new Point(point.r, point.c + 1);
-        p3 = new Point(point.r, point.c - 1);
-      } else {
-        // horz
-        p2 = new Point(point.r + 1, point.c);
-        p3 = new Point(point.r - 1, point.c);
-      }
-      markOuterPair(p1, p2, cameFrom, maze, partOfPath, insidePath);
-      markOuterPair(p1, p3, cameFrom, maze, partOfPath, insidePath);
-      return;
-    }
-
-    // Any other point is eligible to be traversed.
-    char ch = maze[point.r][point.c];
-    markOuter(new Point(point.r - 1, point.c), Direction.SOUTH, maze, partOfPath, insidePath);
-    markOuter(new Point(point.r + 1, point.c), Direction.NORTH, maze, partOfPath, insidePath);
-    markOuter(new Point(point.r, point.c - 1), Direction.EAST, maze, partOfPath, insidePath);
-    markOuter(new Point(point.r, point.c + 1), Direction.WEST, maze, partOfPath, insidePath);
+    System.out.println("Area: " + area);
 
   }
 
-  private static void markOuterPair(Point p1, Point p2, Direction cameFrom, char[][] maze, boolean[][] partOfPath,
-      Boolean[][] insidePath) {
-    if (!p1.isValid(maze) || !p2.isValid(maze)) {
+  private static void markOuter(Point p, char[][] doubleMaze, SpotLabel[][] labels) {
+    if (!p.isValid(doubleMaze)) {
+      return;
+    }
+    // If the point has been seen already, mark it off.
+    if (labels[p.r][p.c] != null) {
       return;
     }
 
-    // If both sides are off the path, this isn't the right traversal.
-    // I think there might be a wrong corner case here.
-    if (!partOfPath[p1.r][p1.c] && !partOfPath[p2.r][p2.c]) {
-      return;
-    }
-
-    char ch1 = maze[p1.r][p1.c];
-    char ch2 = maze[p2.r][p2.c];
-
-    if (!permeablePair(ch1, ch2, cameFrom)) {
-      return;
-    }
-
-    // Continue in the same direction of travel.
-
-    // If one is a dot, call out to the dot and also check for permeable?
-
+    labels[p.r][p.c] = SpotLabel.OUTER;
+    markOuter(new Point(p.r - 1, p.c), doubleMaze, labels);
+    markOuter(new Point(p.r + 1, p.c), doubleMaze, labels);
+    markOuter(new Point(p.r, p.c - 1), doubleMaze, labels);
+    markOuter(new Point(p.r, p.c + 1), doubleMaze, labels);
   }
 
-  private static boolean permeablePair(char c1, char c2, Direction cameFrom) {
-    String c = "" + c1 + c2;
-
-    // F7
-    // LJ
-    // This should compare against cameFrom.invert(), but it doesn't matter for vert
-    // vs. horz.
-    if (cameFrom.isVertical()) {
-      return !c.equals("F7") && !c.equals("F-") && !c.equals("FJ") && !c.equals("LJ") && !c.equals("L-")
-          && !c.equals("L7") && !c.equals("--") && !c.equals("-J") && !c.equals("-7");
-    } else if (cameFrom.isHorizontal()) {
-      return !c.equals("FL") && !c.equals("F|") && !c.equals("FJ") && !c.equals("||") && !c.equals("|L")
-          && !c.equals("|J") && !c.equals("7L") && !c.equals("7|") && !c.equals("7J");
+  private static void fillGap(Point p1, Point p2, char[][] doubleMaze, SpotLabel[][] labels) {
+    // Should only be possible to be off by column or row but not both.
+    if (p1.r != p2.r && p1.c != p2.c) {
+      System.err.println("Double offset " + p1 + " " + p2);
+    } else if (p1.r != p2.r) {
+      // Vertical difference
+      doubleMaze[Math.min(p1.r, p2.r) * 2 + 1][p1.c * 2] = '|';
+      labels[Math.min(p1.r, p2.r) * 2 + 1][p1.c * 2] = SpotLabel.PATH;
+    } else if (p1.c != p2.c) {
+      // Horz difference.
+      doubleMaze[p1.r * 2][Math.min(p1.c, p2.c) * 2 + 1] = '-';
+      labels[p1.r * 2][Math.min(p1.c, p2.c) * 2 + 1] = SpotLabel.PATH;
     } else {
-      System.err.println("can't happen permeable pair");
-      return false;
+      System.err.println("Same point twice? " + p1);
     }
   }
 
@@ -261,21 +240,13 @@ public class P10P2 {
     }
   }
 
-  private static Optional<Point> getInnerTurnPoint(Point point, char[][] maze) {
-    if (!point.isValid(maze)) {
-      return Optional.empty();
+  private static void printMaze(char[][] maze) {
+    for (int r = 0; r < maze.length; r++) {
+      for (int c = 0; c < maze[0].length; c++) {
+        System.out.print(maze[r][c]);
+      }
+      System.out.println();
     }
-    switch (maze[point.r][point.c]) {
-      case 'L':
-        return Optional.of(new Point(point.r - 1, point.c + 1));
-      case 'J':
-        return Optional.of(new Point(point.r - 1, point.c - 1));
-      case '7':
-        return Optional.of(new Point(point.r + 1, point.c - 1));
-      case 'F':
-        return Optional.of(new Point(point.r + 1, point.c + 1));
-    }
-    return Optional.empty();
   }
 }
 
@@ -346,4 +317,10 @@ enum Direction {
   boolean isVertical() {
     return this == NORTH || this == SOUTH;
   }
+}
+
+enum SpotLabel {
+  OUTER,
+  PATH,
+  INNER
 }
