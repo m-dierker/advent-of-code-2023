@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 class P11P2 {
-  public static int EXPANSION_VALUE = 10;
+  public static int EXPANSION_VALUE = 1000000;
 
   public static void main(String[] args) throws Exception {
-    List<String> lines = Files.readAllLines(Paths.get("./data/11-test.txt"));
+    List<String> lines = Files.readAllLines(Paths.get("./data/11.txt"));
 
     List<List<Character>> map = new ArrayList<>(lines.size());
     for (int r = 0; r < lines.size(); r++) {
@@ -60,6 +60,7 @@ class P11P2 {
         Point p1 = galaxies.get(i);
         Point p2 = galaxies.get(j);
         sum += p1.dist(p2, map);
+        System.out.println("Completed traversal " + i + "," + j + ", total size " + galaxies.size());
       }
     }
     System.out.println("sum: " + sum);
@@ -131,8 +132,8 @@ class Point {
       long selfCost = map.get(t.point.r).get(t.point.c) == '.' || map.get(t.point.r).get(t.point.c) == '#' ? 1
           : P11P2.EXPANSION_VALUE;
       if (t.point.equals(this)) {
-        // Initial point has no cost.
-        selfCost = 0;
+        // Initial point apparently has one cost. I don't quite get this.
+        selfCost = 1;
       }
       long totalCost = t.prevCost + selfCost;
 
