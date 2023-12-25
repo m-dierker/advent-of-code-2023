@@ -105,6 +105,9 @@ class Point {
   }
 
   long dist(Point other, List<List<Character>> map) {
+    // TIL afterwards: Full traversal is unnecessary because it's symmetric.
+    // Just the X and Y are enough.
+    // I don't really understand why. Needs more math understanding.
     long[][] bestCostsToDest = new long[map.size()][];
     for (int r = 0; r < bestCostsToDest.length; r++) {
       bestCostsToDest[r] = new long[map.get(0).size()];
